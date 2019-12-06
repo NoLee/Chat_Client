@@ -14,7 +14,7 @@ namespace Chat_Client.Models
         public string Nickname { get; set; }
 
         [JsonPropertyName("timestamp")]
-        public int Timestamp { get; set; }
+        public long Timestamp { get; set; }
 
         [JsonPropertyName("message")]
         public string Message { get; set; }

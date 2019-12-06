@@ -13,16 +13,17 @@ namespace Chat_Client
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
-                .ConfigureServices(services =>
-                {
-                    services.AddHostedService<Service>();
-                }).ConfigureAppConfiguration((context, configurationBuilder) =>
+                .ConfigureAppConfiguration((context, configurationBuilder) =>
                 {
                     var env = context.HostingEnvironment;
 
                     configurationBuilder.SetBasePath(env.ContentRootPath);
                     configurationBuilder.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
                     configurationBuilder.AddConfiguration(context.Configuration);
+                })
+                .ConfigureServices(services =>
+                {
+                    services.AddHostedService<Service>();
                 });
     }
 }
