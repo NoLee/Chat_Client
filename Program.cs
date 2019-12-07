@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -16,7 +17,6 @@ namespace Chat_Client
                 .ConfigureAppConfiguration((context, configurationBuilder) =>
                 {
                     var env = context.HostingEnvironment;
-
                     configurationBuilder.SetBasePath(env.ContentRootPath);
                     configurationBuilder.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
                     configurationBuilder.AddConfiguration(context.Configuration);

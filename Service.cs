@@ -18,63 +18,82 @@ namespace Chat_Client
     internal class Service : IHostedService
 
     {
-        private readonly string exchangeName = "chat_fnt"; // TODO move this to appsetting.json
+        private readonly string _exchangeName;
+
+        private readonly string _hostname;
 
         private string _name;
 
         private int _currentMessageCursorY;
 
-        private readonly IConfiguration _configuration;
-
         public Service(IConfiguration configuration)
         {
-            _configuration = configuration;
+            _hostname = configuration.GetSection("RabbitMQHost").Value;
+            _exchangeName = configuration.GetSection("ExchangeName").Value;
         }
 
         public Task StartAsync(CancellationToken stoppingToken)
         {
-            //string configvalue1 = _configuration.GetSection("RabbitMQ").Value;
-            //Console.WriteLine(configvalue1);
-
             Console.Write("Username:");
             _name = Console.ReadLine();
 
-            var factory = new ConnectionFactory() { HostName = "localhost" }; //TODO pick this from appsettings
-            using (var connection = factory.CreateConnection())
+            var factory = new ConnectionFactory() { HostName = _hostname };
+            try
             {
-                using (var channel = connection.CreateModel())
+                using (var connection = factory.CreateConnection())
                 {
-                    var queueName = DeclareQueue(channel);
-                    AddConsumer(channel, queueName);
-                    PublishMessage(channel, "join");
-
-                    string keyboardInput = Console.ReadLine();
-                    ClearTypedLine(keyboardInput);
-                    while (keyboardInput != "/quit" && keyboardInput != null)
+                    using (var channel = connection.CreateModel())
                     {
-                        if (keyboardInput == "/clear")
+                        var queueName = DeclareQueue(channel);
+                        AddConsumer(channel, queueName);
+                        PublishMessage(channel, "join");
+
+                        string keyboardInput = Console.ReadLine();
+                        ClearTypedLine(keyboardInput);
+                        while (keyboardInput != "/quit" && keyboardInput != null)
                         {
-                            Console.Clear();
-                            _currentMessageCursorY = Console.WindowTop - Console.WindowHeight;
-                            if (_currentMessageCursorY < 0)
+                            if (keyboardInput == "/clear")
                             {
-                                _currentMessageCursorY = 0;
+                                Console.Clear();
+                                _currentMessageCursorY = Console.WindowTop - Console.WindowHeight;
+                                if (_currentMessageCursorY < 0)
+                                {
+                                    _currentMessageCursorY = 0;
+                                }
+
+                                ClearTypedLine(keyboardInput);
                             }
+                            else
+                            {
+                                PublishMessage(channel, "publish", keyboardInput);
+                            }
+
+                            keyboardInput = Console.ReadLine();
                             ClearTypedLine(keyboardInput);
                         }
-                        else
-                        {
-                            PublishMessage(channel, "publish", keyboardInput);
-                        }
 
-                        keyboardInput = Console.ReadLine();
-                        ClearTypedLine(keyboardInput);
+                        PublishMessage(channel, "leave");
+                        Thread.Sleep(3000); // wait a bit to receive message from RabbitMQ and before closing app window
                     }
-
-                    PublishMessage(channel, "leave");
-                    Thread.Sleep(1000); // wait a bit the receive message from RabbitMQ
                 }
             }
+            catch (Exception e)
+            {
+                switch (e.GetType().ToString())
+                {
+                    case "RabbitMQ.Client.Exceptions.BrokerUnreachableException":
+                        {
+                            Console.WriteLine("Cannot connect to provided RabbitMQ host");
+                            break;
+                        }
+                    default:
+                        {
+                            Console.WriteLine("An error occured");
+                            break;
+                        }
+                }
+            }
+
             return Task.CompletedTask;
         }
 
@@ -85,11 +104,11 @@ namespace Chat_Client
 
         private string DeclareQueue(IModel channel)
         {
-            channel.ExchangeDeclare(exchange: exchangeName, type: ExchangeType.Fanout); //TODO optional
+            channel.ExchangeDeclare(exchange: _exchangeName, type: ExchangeType.Fanout); //TODO optional
 
             var queueName = channel.QueueDeclare().QueueName;
             channel.QueueBind(queue: queueName,
-                exchange: exchangeName,
+                exchange: _exchangeName,
                 routingKey: "");
 
             return queueName;
@@ -107,10 +126,11 @@ namespace Chat_Client
 
                 var body = ea.Body;
                 var message = Encoding.UTF8.GetString(body);
-
                 Console.SetCursorPosition(0, _currentMessageCursorY);
-                MessageHandler.Handle(message);
-                _currentMessageCursorY++;
+                if (MessageHandler.Handle(message))
+                {
+                    _currentMessageCursorY++;
+                }
                 Console.SetCursorPosition(cursorLastX, cursosrLastY);
             };
             channel.BasicConsume(queue: queueName,
@@ -127,10 +147,10 @@ namespace Chat_Client
                 Nickname = _name,
                 Message = input
             };
-            var json = JsonSerializer.Serialize<MemberMessageModel>(message);
+            var json = JsonSerializer.Serialize(message);
             var body = Encoding.UTF8.GetBytes(json);
 
-            channel.BasicPublish(exchange: exchangeName,
+            channel.BasicPublish(exchange: _exchangeName,
                     routingKey: "",
                     basicProperties: null,
                     body: body);

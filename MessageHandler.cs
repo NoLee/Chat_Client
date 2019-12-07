@@ -14,7 +14,7 @@ namespace Chat_Client
 
         private static readonly string[] _goodbyeMessages = { "just left.", "you will be missed.", "goodbye :(", "has quit.", "is no longer here.", "dissapeared." };
 
-        public static void Handle(string message)
+        public static bool Handle(string message)
         {
             try
             {
@@ -30,7 +30,7 @@ namespace Chat_Client
                             Console.ForegroundColor = ConsoleColor.Black;
                             Console.WriteLine($"[{dateT}] [JOIN] *{jsonMessage.Nickname}* {_welcomeMessages[random.Next(0, _welcomeMessages.Length)]}");
                             Console.ResetColor();
-                            break;
+                            return true;
                         }
                     case "leave":
                         {
@@ -38,19 +38,23 @@ namespace Chat_Client
                             Console.ForegroundColor = ConsoleColor.Black;
                             Console.WriteLine($"[{dateT}] [LEAVE] *{jsonMessage.Nickname}* {_goodbyeMessages[random.Next(0, _goodbyeMessages.Length)]}");
                             Console.ResetColor();
-                            break;
+                            return true;
                         }
                     case "publish":
                         {
                             Console.WriteLine($"[{dateT}] {jsonMessage.Nickname}: {jsonMessage.Message}");
-                            break;
+                            return true;
                         }
                 }
+                return false;
             }
             catch (Exception e)
             {
-                Console.WriteLine("JSON not recognized");
-                Console.WriteLine(e.ToString());
+                Console.BackgroundColor = ConsoleColor.DarkYellow;
+                Console.ForegroundColor = ConsoleColor.Black;
+                Console.WriteLine("!! Received a message with unrecognized format");
+                Console.ResetColor();
+                return true;
             }
         }
     }
